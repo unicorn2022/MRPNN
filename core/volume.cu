@@ -840,7 +840,7 @@ VolumeRender::VolumeRender(string path) {
     }
     else
     {
-        printf("File not found!\n");
+        printf("File not found! %s\n", path.c_str());
         return;
     }
 

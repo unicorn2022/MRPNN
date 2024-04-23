@@ -9,7 +9,7 @@
 int main()
 {
 #if 1
-    string cloud_path = "./TestCase/CLOUD0";
+    string cloud_path = "E:/MyProject/CG/MRPNN/TestCase/MODEL1";
     VolumeRender v(cloud_path);
     float3 lightColor = { 1.0, 1.0, 1.0 };
     float alpha = 1;
