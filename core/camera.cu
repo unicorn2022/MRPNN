@@ -258,7 +258,7 @@ void Camera::RenderToFile(string path, float3 lightDir, float3 lightColor, float
     delete[] data;
 }
 
-
+/* 执行渲染操作 */
 void Camera::Render(float3* target, Histogram* histo_buffer, unsigned int* target2, int2 size, int frame, float3 lightDir, float3 lightColor, float alpha, int multiScatter, float g, int tone, VolumeRender::RenderType rt, bool denoise) {
     volume->Render(target, histo_buffer, target2, size, ori, up, right, lightDir, lightColor, alpha, multiScatter, g, frame, rt, tone, denoise);
 } 

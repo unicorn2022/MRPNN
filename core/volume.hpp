@@ -64,7 +64,7 @@ class VolumeRender {
 	bool checkboard = true;
 	bool last_predict = true;
 
-	float hginlut = -100;
+	float hginlut = -100;	// LUT中, HG相位函数的系数
 	float3 tr_lightDir;
 	float tr_alpha;
 	float hdri_exp = 1;
@@ -122,7 +122,8 @@ public:
 	float DensityAtUV(int mip, float3 uv);
 	
 	float DensityAtUV(float mip, float3 uv);
-
+	
+	/* 更新HG相位函数LUT */
 	void UpdateHGLut(float g);
 	
 	float GetHGLut(float cos, float angle);
@@ -134,5 +135,6 @@ public:
 	vector<float3> GetTrs(float alpha, vector<float3> ori, vector<float3> dir, float3 lightDir, float3 lightColor,float g = 0, int sampleNum = 1) const;
 
 	vector<float3> Render(int2 size, float3 ori, float3 up, float3 right, float3 lightDir, RenderType rt = RenderType::PT, float g = 0.857, float alpha = 1, float3 lightColor = { 1, 1, 1 }, int multiScatter = 512, int sampleNum = 1024);
+	/* 执行渲染操作 */
 	void Render(float3* taeget, Histogram* histo_buffer, unsigned int* target2, int2 size, float3 ori, float3 up, float3 right, float3 lightDir, float3 lightColor = { 1,1,1 }, float alpha = 1, int multiScatter = 1, float g = 0, int randseed = 0, RenderType rt = RenderType::PT, int toneType = 2, bool denoise = false);
 };

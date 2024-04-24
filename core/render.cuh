@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #ifndef __CUDACC__
 #define __CUDACC__
@@ -432,6 +432,7 @@ enum Type {
     MRPNN = 1
 };
 
+/* MRPNN 网络预测 */
 template<int type = Type::MRPNN, int BatchSize = 4, int StepNum = 1024>
 __device__ float4 NNPredict(float3 ori, float3 dir, float3 lightDir, float3 lightColor = { 1, 1, 1 }, float alpha = 1, float g = 0) {
 
@@ -441,6 +442,7 @@ __device__ float4 NNPredict(float3 ori, float3 dir, float3 lightDir, float3 ligh
     curandState seed;
     InitRand(&seed);
 
+    /* MRPNN or RPNN */
     if (type!= -1) {
         float4 spoint = GetSamplePoint(&seed, ori, dir, alpha);
         float3 pos = make_float3(spoint);
@@ -456,6 +458,7 @@ __device__ float4 NNPredict(float3 ori, float3 dir, float3 lightDir, float3 ligh
 
         float3 predict;
 
+        /* MRPNN 预测 */
         if (type == Type::MRPNN)
         {
             predict = RadiancePredict(&seed, spoint.w > 0, pos, lightDir,
@@ -487,6 +490,7 @@ __device__ float4 NNPredict(float3 ori, float3 dir, float3 lightDir, float3 ligh
 
         return make_float4(active > 0 ? predict * lightColor * scatter_rate : SkyBox(dir), active > 0 ? distance(ori, pos) : -1);
     }
+    /* marching_MRPNN */
     else {
         bool unfinish = true;
         SampleBasis basis = { GetMatrixFromNormal(&seed, dir), GetMatrixFromNormal(&seed, lightDir) };

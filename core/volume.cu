@@ -54,6 +54,8 @@ __device__ float exposure = 1;
 __device__ float3 lori;
 __device__ float3 lup;
 __device__ float3 lright;
+
+/* MRPNN 渲染单个像素(i, h) */
 template<bool predict, int type = Type::MRPNN>
 __global__ void RenderCamera(float3* target, Histogram* histo_buffer, int2 size, float3 ori, float3 up, float3 right, float3 lightDir, float3 lightColor, float alpha, int multiScatter, float g) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
@@ -73,15 +75,16 @@ __global__ void RenderCamera(float3* target, Histogram* histo_buffer, int2 size,
     float3 dir = forward + (right * (u * 2 - 1)) + (up * (v * 2 - 1));
     dir = normalize(dir);
 
+    // 网络预测结果
     float4 res_dis;
     if (predict)
         res_dis = NNPredict<type>(ori, dir, lightDir, lightColor, alpha, g);
     else
         res_dis = CalculateRadiance(ori, dir, lightDir, lightColor, alpha, multiScatter, g, 1);
+    // 渲染结果
     float3 res = make_float3(res_dis);
     bool sky = res_dis.w < 0;
     float dis = max(0.001f, res_dis.w < 0 ? 10.0f : res_dis.w);
-
     res = max(float3{ 0 }, res);
 
 
@@ -466,6 +469,7 @@ vector<float3> VolumeRender::Render(int2 size, float3 ori, float3 up, float3 rig
     return res_cpu;
 }
 
+/* 执行渲染操作 */
 void VolumeRender::Render(float3* target, Histogram* histo_buffer, unsigned int* target2, int2 size, float3 ori, float3 up, float3 right, float3 lightDir, float3 lightColor, float alpha, int multiScatter, float g, int randseed, RenderType rt, int toneType, bool denoise) {
 
     if (env_tex_dev != NULL && (rt != RenderType::PT)) {
@@ -516,6 +520,7 @@ void VolumeRender::Render(float3* target, Histogram* histo_buffer, unsigned int*
     }
     last_predict = predict;
 
+    // 根据不同操作进行渲染
     if (rt == RenderType::PT)
         RenderCamera<false><<<dimGrid, dimBlock>>>(target, histo_buffer, size, ori, up, right, lightDir, lightColor, alpha, multiScatter, g);
     else if (rt == RenderType::RPNN)
@@ -1116,27 +1121,29 @@ __global__ void Fill_Hg(float g) {
 
     surf2Dwrite(hg, hgSurfRef, i * sizeof(float), j);
 }
-void VolumeRender::UpdateHGLut(float g)
-{
+
+/* 更新HG相位函数LUT */
+void VolumeRender::UpdateHGLut(float g) {
     if (g == hginlut) return;
 
+    // 绑定表面纹理
     cudaBindSurfaceToArray(hgSurfRef, hglut_dev);
-
     CheckError;
 
+    // 计算HG相位函数LUT
     Fill_Hg<<<dim3(LUT_SIZE / 8, LUT_SIZE / 8), dim3(8,8)>>>(g);
-
     CheckError;
 
+    // 绑定HG相位函数LUT纹理
     _HGLut.normalized = true;
     _HGLut.filterMode = cudaFilterModeLinear;
     _HGLut.addressMode[0] = cudaAddressModeClamp;
     _HGLut.addressMode[1] = cudaAddressModeClamp;
     _HGLut.addressMode[2] = cudaAddressModeClamp;
     cudaBindTextureToArray(_HGLut, hglut_dev);
-
     CheckError;
 
+    // 更新当前LUT对应的HG的参数
     hginlut = g;
 }
 float VolumeRender::GetHGLut(float cos, float angle)

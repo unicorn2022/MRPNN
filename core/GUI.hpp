@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 
 #ifdef LINUX
@@ -58,8 +58,8 @@ static GLFWwindow* init_opengl(int reso, string name)
     return window;
 }
 
-static void init_cuda()
-{
+/* 初始化 CUDA 上下文 */
+static void init_cuda() {
     int cuda_devices[1];
     unsigned int num_cuda_devices;
     cudaGLGetDevices(&num_cuda_devices, cuda_devices, 1, cudaGLDeviceListAll);
@@ -69,8 +69,9 @@ static void init_cuda()
     }
     cudaSetDevice(cuda_devices[0]);
 }
-struct Window_context
-{
+
+/* Window 上下文 */
+struct Window_context {
     int zoom_delta;
 
     bool moving;
@@ -862,6 +863,7 @@ void SaveFB(GLFWwindow* window, char* fileName)
 
 void RunGUI(Camera& cam, VolumeRender& volume, float3 lightDir = normalize({ 1,1,1 }), float3 lightColor = { 1,1,1 }, float3 scatter_rate = { 1, 1, 1 }, float alpha = 1, float multiScatterNum = 10, float g = 0, bool hideConsole = false) {
 #ifdef GUI
+    // 隐藏控制台
     if (hideConsole) {
         HWND hwnd;
         hwnd = FindWindow("ConsoleWindowClass", NULL);
@@ -872,8 +874,8 @@ void RunGUI(Camera& cam, VolumeRender& volume, float3 lightDir = normalize({ 1,1
         }
     }
 
+    // 初始化 GUI
     GUIs gui(cam);
-
     gui.G = g;
     gui.alpha = alpha;
     gui.ms = multiScatterNum;
@@ -881,7 +883,8 @@ void RunGUI(Camera& cam, VolumeRender& volume, float3 lightDir = normalize({ 1,1
     gui.lighty = atan2(lightDir.y, sqrt(max(0.0001f, lightDir.x * lightDir.x + lightDir.z * lightDir.z)));
     gui.lightColor = lightColor;
     gui.scatter_rate = scatter_rate;
-
+    
+    // 更新HG相位函数LUT的参数值
     volume.UpdateHGLut(g);
 
     Window_context window_context;
@@ -895,7 +898,7 @@ void RunGUI(Camera& cam, VolumeRender& volume, float3 lightDir = normalize({ 1,1
     int width = -1;
     int height = -1;
 
-    // Init OpenGL window and callbacks.
+    // 初始化 OpenGL 窗口&回调函数
     window = init_opengl(cam.resolution, cam.name);
     glfwSetWindowUserPointer(window, &window_context);
     glfwSetKeyCallback(window, handle_key);
@@ -923,6 +926,7 @@ void RunGUI(Camera& cam, VolumeRender& volume, float3 lightDir = normalize({ 1,1
     program = create_shader_program();
     quad_vao = create_quad(program, &quad_vertex_buffer);
 
+    // 初始化 CUDA
     init_cuda();
 
     float3* accum_buffer = NULL;
@@ -936,12 +940,13 @@ void RunGUI(Camera& cam, VolumeRender& volume, float3 lightDir = normalize({ 1,1
     int zoom = 0;
 
     auto panel = thread([&]() {
-        Main_Loop(gui);
-        });
+            Main_Loop(gui);
+        }
+    );
 
+    /* 渲染循环 */
     while (!glfwWindowShouldClose(window)) {
-
-        // Process events.
+        // 处理事件
         glfwPollEvents();
         Window_context* ctx = static_cast<Window_context*>(glfwGetWindowUserPointer(window));
         if (ctx->move_dx != 0.0 || ctx->move_dy != 0.0 || ctx->zoom_delta) {
@@ -959,14 +964,13 @@ void RunGUI(Camera& cam, VolumeRender& volume, float3 lightDir = normalize({ 1,1
             gui.frame = 0;
         }
 
-        // Reallocate buffers if window size changed.
+        // 如果 window size 改变, 则从新分配内存
         int nwidth, nheight;
         glfwGetFramebufferSize(window, &nwidth, &nheight); 
         if (gui.fsr) {
             nwidth /= 2; nheight /= 2;
         }
-        if (nwidth != width || nheight != height)
-        {
+        if (nwidth != width || nheight != height) {
             width = nwidth;
             height = nheight;
 
@@ -1021,6 +1025,7 @@ void RunGUI(Camera& cam, VolumeRender& volume, float3 lightDir = normalize({ 1,1
 
             auto start_time = std::chrono::system_clock::now();
 
+            // 执行渲染操作
             cam.Render(accum_buffer, histo_buffer_cuda, reinterpret_cast<unsigned int*>(p), int2{ width , height }, gui.frame, l, gui.lightColor, gui.alpha, gui.ms, gui.G, gui.toneType, 
                 gui.predict ? 
                     (gui.mrpnn ? VolumeRender::RenderType::MRPNN : VolumeRender::RenderType::RPNN)

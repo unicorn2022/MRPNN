@@ -1,4 +1,4 @@
-#include "radiancePredict.cuh"
+﻿#include "radiancePredict.cuh"
 
 
 #include "vector.cuh"
@@ -304,6 +304,7 @@ __device__ inline void Rep(float* A, const float* B, const int Size, const int A
 // ---------------------------------------------------------
 #include "NNWeight.cuh"
 
+/* 网络预测: x, light_dir => radiance */
 __device__ float3 RadiancePredict(curandState* seed, bool active, float3 pos, float3 LightDir, float3 XMain, float3 YMain, float3 ZMain, float3 LXMain, float3 LYMain, float3 LZMain, float alpha, float g, float3 scatterrate)
 {
     const int PC = 192;
