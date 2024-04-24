@@ -1,4 +1,4 @@
-#include "volume.hpp"
+﻿#include "volume.hpp"
 
 #include "hdr_loader.h"
 
@@ -745,6 +745,7 @@ struct InitWeight {
     InitWeight();
 };
 
+/* 申请 CPU & GPU 内存 */
 void VolumeRender::MallocMemory() {
     cudaFree(0);
 
@@ -753,40 +754,54 @@ void VolumeRender::MallocMemory() {
     channel_desc = cudaCreateChannelDesc<float>();
     size = cudaExtent{ (size_t)resolution, (size_t)resolution, (size_t)resolution };
     cudaMalloc3DArray(&datas_dev, &channel_desc, size);
+    printf("[VolumeRender::MallocMemory] volume data (%d * %d * %d) 申请内存成功\n", resolution, resolution, resolution);
+
 
     for (int i = 0; i < 9; i++) {
         int reso = 256 >> i;
         mips[i] = new float[reso * reso * reso];
         mip_size[i] = cudaExtent{ (size_t)reso, (size_t)reso, (size_t)reso };
         cudaMalloc3DArray(mips_dev + i, &channel_desc, mip_size[i]);
+        printf("[VolumeRender::MallocMemory] mip data (%d * %d * %d) 申请内存成功\n", reso, reso, reso);
     }
     for (int i = 0; i < 8; i++) {
         int reso = 128 >> i;
         tr_mips[i] = new float[reso * reso * reso];
         tr_mip_size[i] = cudaExtent{ (size_t)reso, (size_t)reso, (size_t)reso };
         cudaMalloc3DArray(tr_mips_dev + i, &channel_desc, tr_mip_size[i], cudaArraySurfaceLoadStore);
+        printf("[VolumeRender::MallocMemory] transmittance mip data (%d * %d * %d) 申请内存成功\n", reso, reso, reso);
     }
 
     cudaMallocArray(&hglut_dev, &channel_desc, LUT_SIZE, LUT_SIZE, cudaArraySurfaceLoadStore);
+    printf("[VolumeRender::MallocMemory] LUT (%d * %d) 申请内存成功\n", LUT_SIZE, LUT_SIZE);
+    printf("\n");
 }
 
-//InitWeight weight;
-
+/* 初始化 VolumeRender: 分辨率为 resolution */
 VolumeRender::VolumeRender(int resolution) : resolution(resolution) {
     MallocMemory();
 }
 
+/* 初始化 VolumeRender: 从 path 中读取 volume */
 VolumeRender::VolumeRender(string path) {
 
     if (FILE* file = fopen((path + ".bin").c_str(), "rb")) {
+        printf("[VolumeRender::VolumeRender] 文件读取成功\n");
+        // CPU 读取分辨率
         fread(&resolution, sizeof(int), 1, file);
+        // 申请 CPU & GPU 内存
         MallocMemory();
+        // CPU 读取数据
         fread(datas, sizeof(float), resolution * resolution * resolution, file);
         fclose(file);
+        // 构建mipmap, 拷贝数据
         Update();
+        printf("[VolumeRender::VolumeRender] 初始化完成\n");
+        printf("==========================================================================================\n");
         return;
     }
 
+    printf("[VolumeRender::VolumeRender] 文件读取失败\n");
     string format = path.substr(path.size() - 3, 3);
     if (format == "txt") {
         FILE* f = fopen(path.c_str(), "r");
@@ -854,6 +869,7 @@ VolumeRender::VolumeRender(string path) {
     }
 }
 
+/* 销毁 VolumeRender: 释放 CPU & GPU 内存*/
 VolumeRender::~VolumeRender() {
     cudaFreeArray(datas_dev);
     cudaFreeArray(hglut_dev);
@@ -1142,7 +1158,10 @@ float VolumeRender::GetHGLut(float cos, float angle)
     float axx = lerp(ax0, ax1, frac(u * LUT_SIZE));
     return axx;
 }
+
+/* 构建mipmap, 将数据拷贝到GPU, 并绑定3D纹理 */
 void VolumeRender::Update() {
+    // 拷贝 volume data
     cudaMemcpy3DParms copyParams = { 0 };
     copyParams.srcPtr = make_cudaPitchedPtr((void*)datas, resolution * sizeof(float), resolution, resolution);
     copyParams.dstArray = datas_dev;
@@ -1150,62 +1169,80 @@ void VolumeRender::Update() {
     copyParams.kind = cudaMemcpyHostToDevice;
     cudaMemcpy3D(&copyParams);
     CheckError;
+    printf("[VolumeRender::Update] volume data 拷贝数据成功\n");
+
+    // 绑定 volume data 的3D纹理
     _DensityVolume.normalized = true;
     _DensityVolume.filterMode = cudaFilterModeLinear;
     _DensityVolume.addressMode[0] = cudaAddressModeBorder;
     _DensityVolume.addressMode[1] = cudaAddressModeBorder;
     _DensityVolume.addressMode[2] = cudaAddressModeBorder;
-
     cudaBindTextureToArray(_DensityVolume, datas_dev, channel_desc);
     CheckError;
+    printf("[VolumeRender::Update] volume data 绑定3D纹理成功\n");
+
+    // 计算 Resulution, maxDensity
     float md = 0.00001;
-    for (int i = 0; i < resolution * resolution * resolution; i++)
-    {
+    for (int i = 0; i < resolution * resolution * resolution; i++) {
         md = max(md, datas[i]);
     }
     max_density = md;
     cudaMemcpyToSymbol(Resolution, &resolution, sizeof(int), 0, cudaMemcpyHostToDevice);
     cudaMemcpyToSymbol(maxDensity, &md, sizeof(float), 0, cudaMemcpyHostToDevice);
     CheckError;
+    printf("[VolumeRender::Update] Resolution = %d, maxDensity = %f, 拷贝到GPU变量中\n", resolution, md);
+
+    // 调整 source 的分辨率, 保证是2的整数幂
     int res = 256;
     while (res * 2 < resolution) res <<= 1;
+    printf("[VolumeRender::Update] source 的分辨率调整为: %d\n", res);
 
+    // 构建 source 数据
     float* source = datas;
     int source_res = resolution;
-    for (;res > 256; res >>= 1)
-    {
+    for (;res > 256; res >>= 1) {
+        // 构建数据
         float* temp = new float[res * res * res];
+        ParallelFill(temp, res, 
+            [&](int x, int y, int z, float u, float v, float w) {
+                return Sample(source, source_res, float3{ u,v,w });
+            }
+        );
 
-        ParallelFill(temp, res, [&](int x, int y, int z, float u, float v, float w) {
-            return Sample(source, source_res, float3{ u,v,w });
-        });
-
-        if (source != datas)
-            delete[] source;
+        // 删除CPU端冗余内存
+        if (source != datas) delete[] source;
         source = temp;
         source_res = res;
     }
-    for (int mip = 0; mip < 9; mip++)
-    {
+    printf("[VolumeRender::Update] 源数据大小为: %d * %d * %d\n", source_res, source_res, source_res);
+
+    // 构建 mipmap 数据
+    for (int mip = 0; mip < 9; mip++) {
+        // 构建数据
         res = 256 >> mip;
+        ParallelFill(mips[mip], res, 
+            [&](int x, int y, int z, float u, float v, float w) {
+                return Sample(source, source_res, float3{ u,v,w });
+            }
+        );
 
-        ParallelFill(mips[mip], res, [&](int x, int y, int z, float u, float v, float w) {
-            return Sample(source, source_res, float3{ u,v,w });
-            });
-
-        if (mip == 0 && source != datas)
-            delete[] source;
+        // 删除CPU端冗余内存
+        if (mip == 0 && source != datas) delete[] source;
         source = mips[mip];
         source_res = res;
+
+        // 拷贝 volume mip
         cudaMemcpy3DParms copyParams = { 0 };
         copyParams.srcPtr = make_cudaPitchedPtr((void*)source, source_res * sizeof(float), source_res, source_res);
         copyParams.dstArray = mips_dev[mip];
         copyParams.extent = make_cudaExtent(source_res, source_res, source_res);
         copyParams.kind = cudaMemcpyHostToDevice;
         cudaMemcpy3D(&copyParams);
-
         CheckError;
+        printf("[VolumeRender::Update] volume mip %d (%d * %d * %d) 拷贝数据成功\n", mip, res, res, res);
     }
+
+
     #define BindMip(i)  Mip(i).normalized = true;\
                         Mip(i).filterMode = cudaFilterModeLinear;\
                         Mip(i).addressMode[0] = cudaAddressModeBorder;\
@@ -1216,10 +1253,10 @@ void VolumeRender::Update() {
     BindMip(0); BindMip(1); BindMip(2);
     BindMip(3); BindMip(4); BindMip(5);
     BindMip(6); BindMip(7); BindMip(8);
-
     #undef BindMip
-
     CheckError;
+    printf("[VolumeRender::Update] volume mip 0~8 绑定3D纹理成功\n");
+    printf("\n");
 }
 
 texture<float, cudaTextureType3D, cudaReadModeElementType>  texRef;

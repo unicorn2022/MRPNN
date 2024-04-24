@@ -1,0 +1,8 @@
+{
+    "files.associations": {
+        "*.pyscene": "python",
+        "*.tcc": "cpp",
+        "xlocmon": "cpp",
+        "xmemory": "cpp"
+    }
+}

@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "vector.cuh"
 #include "omp.hpp"
@@ -43,9 +43,23 @@ public:
 };
 
 class VolumeRender {
-	int resolution;
-	float* datas;
-	float* hglut;
+	/* CPU 端数据 */
+	int resolution;		// volume 分辨率
+	float* datas;		// volume 数据(CPU), size = resolution^3
+	float* hglut;		// LUT 数据(CPU), size = LUT_SIZE^2
+	float* mips[9];		// volume mip 数据(CPU), size = (256 >> i)^3
+	float* tr_mips[8];	// transmittance mip 数据(CPU), size = (128 >> i)^3
+	float* tr_mips2[8];	// 
+
+	/* GPU 端数据 */
+	cudaChannelFormatDesc channel_desc;
+	cudaExtent size;			// volume 数据(GPU)大小
+	cudaArray* datas_dev = 0;	// volume 数据(GPU), size = {resolution, resolution, resolution}
+	cudaArray* hglut_dev = 0;	// LUT 数据(GPU), size = {LUT_SIZE, LUT_SIZE}
+	cudaExtent mip_size[9];		// volume mip 大小
+	cudaArray* mips_dev[9];		// volume mip 数据(GPU), size = {256 >> i, 256 >> i, 256 >> i}
+	cudaExtent tr_mip_size[8];	// transmittance mip 大小
+	cudaArray* tr_mips_dev[8];	// transmittance mip 数据(GPU), size = {128 >> i, 128 >> i, 128 >> i}
 	
 	bool checkboard = true;
 	bool last_predict = true;
@@ -53,28 +67,13 @@ class VolumeRender {
 	float hginlut = -100;
 	float3 tr_lightDir;
 	float tr_alpha;
-
-	float* mips[9];
-	float* tr_mips[8];
-	float* tr_mips2[8];
-
 	float hdri_exp = 1;
-
-	cudaArray* hglut_dev = 0;
-
-	cudaArray* datas_dev = 0;
-	cudaChannelFormatDesc channel_desc;
-	cudaExtent size;
-
-	cudaArray* mips_dev[9];
-	cudaExtent mip_size[9];
-
-	cudaArray* tr_mips_dev[8];
-	cudaExtent tr_mip_size[8];
 
 	cudaArray* env_tex_dev = 0;
 
 	VolumeRender(const VolumeRender& obj) = delete;
+
+	/* 申请 CPU & GPU 内存 */
 	void MallocMemory();
 
 public:
@@ -86,14 +85,18 @@ public:
 
 	float max_density = 0.00001;
 
+	/* 初始化 VolumeRender: 分辨率为 resolution */
 	VolumeRender(int resolution);
+	/* 初始化 VolumeRender: 从 path 中读取 volume */
 	VolumeRender(string path);
+	/* 销毁 VolumeRender: 释放 CPU & GPU 内存*/
 	~VolumeRender();
 
 	void SetData(int x, int y, int z, float value);
 
 	void SetDatas(FillFunc func);
-
+	
+	/* 构建mipmap, 将数据拷贝到GPU, 并绑定3D纹理 */
 	void Update();
 	void Update_TR(float3 lightDir,float alpha = 64.0f, bool CPU = false);
 

@@ -1,4 +1,4 @@
-#include "volume.hpp"
+﻿#include "volume.hpp"
 #include "camera.hpp"
 #include "sample_method.hpp"
 #include "GUI.hpp"
@@ -6,10 +6,9 @@
 #include <random>
 #include <iomanip>
 
-int main()
-{
+int main() {
 #if 1
-    string cloud_path = "E:/MyProject/CG/MRPNN/TestCase/MODEL1";
+    string cloud_path = "E:/MyProject/CG/MRPNN/TestCase/CLOUD0";
     VolumeRender v(cloud_path);
     float3 lightColor = { 1.0, 1.0, 1.0 };
     float alpha = 1;
