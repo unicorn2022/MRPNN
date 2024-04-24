@@ -106,7 +106,9 @@ public:
 	void SetEnvExp(float exp);
 
 	void SetTrScale(float scale);
+	/* 设置云的散射率 */
 	void SetScatterRate(float rate);
+	/* 设置云的散射率 */
 	void SetScatterRate(float3 rate);
 	void SetExposure(float exp);
 

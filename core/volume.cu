@@ -797,7 +797,7 @@ VolumeRender::VolumeRender(string path) {
         // 构建mipmap, 拷贝数据
         Update();
         printf("[VolumeRender::VolumeRender] 初始化完成\n");
-        printf("==========================================================================================\n");
+        printf("==========================================================================================\n\n");
         return;
     }
 
@@ -1417,14 +1417,16 @@ void VolumeRender::SetTrScale(float scale)
     cudaMemcpyToSymbol(tr_scale, &scale, sizeof(float), 0, cudaMemcpyHostToDevice);
 }
 
-void VolumeRender::SetScatterRate(float rate)
-{
+/* 设置云的散射率 */
+void VolumeRender::SetScatterRate(float rate) {
     SetScatterRate({ rate,rate,rate });
 }
 
-void VolumeRender::SetScatterRate(float3 rate)
-{
+/* 设置云的散射率 */
+void VolumeRender::SetScatterRate(float3 rate) {
     cudaMemcpyToSymbol(scatter_rate, &rate, sizeof(float3), 0, cudaMemcpyHostToDevice);
+    // printf("[VolumeRender::SetScatterRate] rate = (%f, %f, %f)\n", rate.x, rate.y, rate.z);
+    // printf("==========================================================================================\n\n");
 }
 
 void VolumeRender::SetExposure(float exp)

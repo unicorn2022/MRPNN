@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "camera.hpp"
 
@@ -160,6 +160,7 @@ float3 Camera::ACES(float3 color) {
 }
 
 
+/* 初始化 Camera */
 Camera::Camera(VolumeRender& volume, string name, float3 position, int resolution) {
     ori = position;
     forward = normalize(-ori);
@@ -168,6 +169,9 @@ Camera::Camera(VolumeRender& volume, string name, float3 position, int resolutio
     this->name = name;
     this->volume = &volume;
     this->resolution = resolution;
+    printf("[Camera::Camera] 初始化完成\n");
+    printf("ori = (%f, %f, %f), name = %s, resolution = %d\n", position.x, position.y, position.z, name.c_str(), resolution);
+    printf("==========================================================================================\n\n");
 }
 
 void Camera::SetPosition(float3 position) {
@@ -186,6 +190,9 @@ void Camera::SetPosition(float3 position) {
             up = float3{0,0,-1};
         }
     }
+    printf("[Camera::SetPosition] 更改相机位置\n");
+    printf("ori = (%f, %f, %f)\n", position.x, position.y, position.z);
+    printf("==========================================================================================\n\n");
 }
 
 void Camera::SetVolume(VolumeRender& volume) {

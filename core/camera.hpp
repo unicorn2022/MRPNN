@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "volume.hpp"
 #include <functional>
@@ -26,8 +26,10 @@ public:
     int resolution;
     string name;
 
+    /* 初始化 Camera */
     Camera(VolumeRender& volume, string name = "test camera", float3 position = { 0.75, 0.75, 0.75 }, int resolution = 512);
 
+    /* 更改 Camera 位置 */
     void SetPosition(float3 position);
 
     float3 GetPosition() const { return ori; };
